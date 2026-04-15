@@ -94,14 +94,17 @@ jobs:
     
     - name: Setup Android SDK
       run: |
-        mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools
-        cd ~/.buildozer/android/platform/android-sdk/cmdline-tools
+        export ANDROID_HOME=~/.buildozer/android/platform/android-sdk
+        mkdir -p $ANDROID_HOME/cmdline-tools
+        cd $ANDROID_HOME/cmdline-tools
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         unzip -q commandlinetools-linux-9477386_latest.zip
         mv cmdline-tools latest
         rm commandlinetools-linux-9477386_latest.zip
-        export ANDROID_HOME=~/.buildozer/android/platform/android-sdk
-        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+        # Criar symlink para buildozer encontrar sdkmanager
+        mkdir -p $ANDROID_HOME/tools/bin
+        ln -sf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager $ANDROID_HOME/tools/bin/sdkmanager
+        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/tools/bin
         yes | sdkmanager --licenses || true
         sdkmanager "platform-tools" "build-tools;33.0.0" "platforms;android-33" || true
     
