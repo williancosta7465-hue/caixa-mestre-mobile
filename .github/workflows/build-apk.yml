@@ -1,0 +1,124 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          python3-pip build-essential git \
+          zip unzip openjdk-17-jdk \
+          autoconf libtool pkg-config \
+          zlib1g-dev libncurses6 libncursesw6 \
+          cmake libffi-dev libssl-dev
+    
+    - name: Install Python dependencies
+      run: |
+        pip install --upgrade pip
+        pip install Cython==0.29.36
+        pip install buildozer
+    
+    - name: Debug - List files
+      run: |
+        echo "Current directory:"
+        pwd
+        echo "Files in root:"
+        ls -la
+        echo "Looking for mobile:"
+        find . -name "mobile*" -type d 2>/dev/null || echo "No mobile dir found"
+        find . -name "mobile.zip" -type f 2>/dev/null || echo "No mobile.zip found"
+    
+    - name: Debug ZIP contents
+      run: |
+        if [ -f mobile.zip ]; then
+          echo "=== ZIP file info ==="
+          ls -lh mobile.zip
+          echo "=== ZIP contents ==="
+          unzip -l mobile.zip | head -30
+        fi
+    
+    - name: Extract mobile.zip
+      run: |
+        if [ -f mobile.zip ]; then
+          echo "Extracting mobile.zip..."
+          rm -rf mobile/ extracted/
+          # Extrair para pasta temporária
+          mkdir extracted
+          unzip -q -o mobile.zip -d extracted/
+          echo "Contents of extracted/:"
+          ls -la extracted/
+          echo "Checking if mobile/ was created inside:"
+          ls -la extracted/mobile/ 2>/dev/null || echo "No mobile/ inside"
+          # Mover para lugar correto
+          if [ -d extracted/mobile ]; then
+            mv extracted/mobile .
+            echo "Moved extracted/mobile to ./mobile"
+          else
+            mv extracted mobile
+            echo "Renamed extracted to mobile"
+          fi
+          echo "Final contents:"
+          ls -la mobile/
+        else
+          echo "ERROR: mobile.zip not found!"
+          ls -la
+          exit 1
+        fi
+    
+    - name: Verify mobile directory
+      run: |
+        if [ ! -d mobile ]; then
+          echo "ERROR: mobile/ directory does not exist!"
+          exit 1
+        fi
+        echo "mobile/ directory verified"
+        ls -la mobile/
+    
+    - name: Build APK
+      run: |
+        cd mobile
+        ls -la
+        buildozer -v android debug
+      env:
+        BUILDOZER_WARN_ON_ROOT: 0
+        
+    - name: List generated files
+      run: |
+        ls -la mobile/bin/
+    
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: caixa-mestre-mobile-apk
+        path: mobile/bin/*.apk
+        if-no-files-found: error
+        
+    - name: Comment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '✅ APK Android gerado com sucesso! Faça download na seção **Artifacts**.'
+          })
