@@ -36,12 +36,31 @@ jobs:
         echo "=== buildozer.spec corrigido ==="
         cat buildozer.spec
     
+    - name: Setup Android SDK
+      run: |
+        export ANDROID_HOME=~/.buildozer/android/platform/android-sdk
+        mkdir -p $ANDROID_HOME/cmdline-tools
+        cd $ANDROID_HOME/cmdline-tools
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+        unzip -q commandlinetools-linux-9477386_latest.zip
+        mv cmdline-tools latest
+        rm commandlinetools-linux-9477386_latest.zip
+        # Criar estrutura para buildozer
+        mkdir -p $ANDROID_HOME/tools/bin
+        ln -sf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager $ANDROID_HOME/tools/bin/sdkmanager
+        # Aceitar licenças
+        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/tools/bin
+        yes | sdkmanager --licenses > /dev/null 2>&1 || true
+        # Instalar build-tools
+        sdkmanager "build-tools;33.0.0" "platform-tools" "platforms;android-33" > /dev/null 2>&1 || true
+    
     - name: Build APK
       run: |
         cd mobile
         buildozer android debug
       env:
         BUILDOZER_WARN_ON_ROOT: 0
+        ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
         
     - name: Upload APK
       uses: actions/upload-artifact@v4
