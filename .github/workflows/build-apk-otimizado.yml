@@ -1,0 +1,50 @@
+name: Build APK Otimizado
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Instalar dependências
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq python3-pip build-essential git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses6 cmake libffi-dev libssl-dev > /dev/null 2>&1
+        pip install -q Cython==0.29.36 buildozer
+    
+    - name: Extrair ZIP e corrigir buildozer.spec
+      run: |
+        unzip -q -o mobile.zip
+        cd mobile
+        # Corrigir buildozer.spec - remover linhas problemáticas
+        sed -i '/^android\.api\s*=/d' buildozer.spec
+        sed -i '/^android\.ndk\s*=/d' buildozer.spec  
+        sed -i '/^android\.sdk\s*=/d' buildozer.spec
+        # Adicionar minapi se não existir
+        if ! grep -q "android.minapi" buildozer.spec; then
+          echo "android.minapi = 21" >> buildozer.spec
+        fi
+        echo "=== buildozer.spec corrigido ==="
+        cat buildozer.spec
+    
+    - name: Build APK
+      run: |
+        cd mobile
+        buildozer android debug
+      env:
+        BUILDOZER_WARN_ON_ROOT: 0
+        
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: caixa-mestre-apk
+        path: mobile/bin/*.apk
