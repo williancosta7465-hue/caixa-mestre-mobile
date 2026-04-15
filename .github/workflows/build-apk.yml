@@ -92,20 +92,27 @@ jobs:
         echo "mobile/ directory verified"
         ls -la mobile/
     
-    - name: Accept Android SDK licenses
+    - name: Setup Android SDK
       run: |
-        mkdir -p ~/.buildozer/android/platform/android-sdk
+        mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools
+        cd ~/.buildozer/android/platform/android-sdk/cmdline-tools
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+        unzip -q commandlinetools-linux-9477386_latest.zip
+        mv cmdline-tools latest
+        rm commandlinetools-linux-9477386_latest.zip
         export ANDROID_HOME=~/.buildozer/android/platform/android-sdk
-        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-      continue-on-error: true
+        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+        yes | sdkmanager --licenses || true
+        sdkmanager "platform-tools" "build-tools;33.0.0" "platforms;android-33" || true
     
     - name: Build APK
       run: |
         cd mobile
         ls -la
-        echo "y" | buildozer -v android debug
+        buildozer -v android debug
       env:
         BUILDOZER_WARN_ON_ROOT: 0
+        ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
         
     - name: List generated files
       run: |
